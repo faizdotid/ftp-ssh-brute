@@ -4,8 +4,8 @@ Modern asynchronous FTP & SSH brute-forcer toolkit using default credential word
 
 ## Features
 
-- **ftpBrute.py** — Fast async FTP brute-forcer with auto-upload proof-of-access.
-- **sshBrute.py** — Fast async SSH brute-forcer with remote command execution check.
+- **ftp_brute.py** — Fast async FTP brute-forcer with auto-upload proof-of-access.
+- **ssh_brute.py** — Fast async SSH brute-forcer with remote command execution check.
 - Rich console output with progress spinners and result tables.
 - Configurable concurrency, timeouts, and custom wordlists.
 - Clean argparse CLI (no more manual input prompts).
@@ -21,15 +21,15 @@ pip install -r requirements.txt
 ### FTP Brute
 
 ```bash
-python ftpBrute.py -t targets.txt
-python ftpBrute.py -t targets.txt -w ftp-betterdefaultpasslist.txt -c 100 -o results/
+python ftp_brute.py -t targets.txt
+python ftp_brute.py -t targets.txt -w ftp-betterdefaultpasslist.txt -c 100 -o results/
 ```
 
 ### SSH Brute
 
 ```bash
-python sshBrute.py -t targets.txt
-python sshBrute.py -t targets.txt -w ssh-betterdefaultpasslist.txt -c 100 -p 2222 -o results/
+python ssh_brute.py -t targets.txt
+python ssh_brute.py -t targets.txt -w ssh-betterdefaultpasslist.txt -c 100 -p 2222 -o results/
 ```
 
 ## Options
