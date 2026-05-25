@@ -43,7 +43,11 @@ python ssh_brute.py -t targets.txt -w ssh-betterdefaultpasslist.txt -c 100 -p 22
 | `--timeout` | Connection timeout in seconds (default: 15) |
 | `-o, --output` | Output directory for result files |
 
-## Wordlist Format
+## Wordlist
+
+Default wordlists included in this repo are sourced from [SecLists](https://github.com/danielmiessler/SecLists).
+
+### Format
 
 One credential per line:
 
