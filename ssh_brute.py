@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import socket
 import sys
+import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -48,7 +50,11 @@ class BruteResult:
 def parse_host(hostname: str) -> str:
     hostname = hostname.strip()
     if "://" in hostname:
-        hostname = hostname.split("/")[2]
+        hostname = urllib.parse.urlsplit(hostname).hostname or hostname
+    else:
+        hostname = hostname.rstrip("/")
+    if hostname.startswith("[") and "]" in hostname:
+        return hostname[1 : hostname.index("]")]
     if ":" in hostname:
         hostname = hostname.split(":")[0]
     return hostname.rstrip("/")
@@ -111,21 +117,15 @@ class SshBruteForcer:
                 allow_agent=False,
             )
             return True, client
-        except paramiko.AuthenticationException:
+        except (paramiko.AuthenticationException, paramiko.SSHException, socket.error):
+            client.close()
             return False, None
-        except paramiko.SSHException:
-            return False, None
-        except Exception:
-            return False, None
-        finally:
-            if not client.get_transport() or not client.get_transport().is_active():
-                client.close()
 
     def _exec_id(self, client: paramiko.SSHClient) -> bool:
         try:
             stdin, stdout, stderr = client.exec_command("id", timeout=self.timeout)
-            stdout.channel.recv_exit_status()
-            return True
+            status = stdout.channel.recv_exit_status()
+            return status == 0
         except Exception:
             return False
         finally:

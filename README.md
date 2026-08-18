@@ -22,7 +22,7 @@ pip install -r requirements.txt
 
 ```bash
 python ftp_brute.py -t targets.txt
-python ftp_brute.py -t targets.txt -w ftp-betterdefaultpasslist.txt -c 100 -o results/
+python ftp_brute.py -t targets.txt -w ftp-betterdefaultpasslist.txt -c 100 -p 2121 -o results/
 ```
 
 ### SSH Brute
@@ -39,7 +39,7 @@ python ssh_brute.py -t targets.txt -w ssh-betterdefaultpasslist.txt -c 100 -p 22
 | `-t, --targets` | File containing target hosts/URLs |
 | `-w, --wordlist` | Credential wordlist (user:pass format) |
 | `-c, --concurrency` | Max concurrent connections (default: 50) |
-| `-p, --port` | SSH port only (default: 22) |
+| `-p, --port` | FTP/SSH port (default: 21 FTP, 22 SSH) |
 | `--timeout` | Connection timeout in seconds (default: 15) |
 | `-o, --output` | Output directory for result files |
 
@@ -60,3 +60,5 @@ user:password123
 ## Disclaimer
 
 This tool is intended for authorized security testing and research only. Always obtain proper permission before testing systems you do not own.
+
+> **Note:** `ssh_brute.py` uses `AutoAddPolicy()`, which disables SSH host-key verification. This makes the tool vulnerable to man-in-the-middle attacks — acceptable for testing, but never use it on untrusted networks.
